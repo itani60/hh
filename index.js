@@ -130,23 +130,25 @@ function createSmartphoneProductCard(product) {
 }
 
 /**
- * Display smartphone products in the deals section
+ * Display smartphone products in a carousel
  * @param {Array} products - The products to display
- * @param {number} page - The current page number
- * @param {string} sortBy - The sorting criteria
  */
-function displaySmartphoneProducts(products, page = 1, sortBy = "relevance") {
-    // Get the products grid element
-    const productsGrid = document.getElementById("tv-section").querySelector(".products-grid");
+function displaySmartphoneProducts(products) {
+    // Get the carousel elements
+    const slider = document.getElementById('smartphoneSlider');
+    const indicatorsContainer = document.getElementById('smartphoneIndicators');
 
-    // Clear the grid
-    productsGrid.innerHTML = "";
+    if (!slider || !indicatorsContainer) return;
+
+    // Clear existing content
+    slider.innerHTML = '';
+    indicatorsContainer.innerHTML = '';
 
     // Filter out any invalid products
     const validProducts = products.filter(product => product && (product.name || product.model || product.title));
 
     if (validProducts.length === 0) {
-        productsGrid.innerHTML = `
+        slider.innerHTML = `
             <div class="no-results" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 0;">
                 <i class="fas fa-search" style="font-size: 48px; color: #ccc; margin-bottom: 20px;"></i>
                 <p style="font-size: 18px; margin-bottom: 20px; font-weight: bold;">No smartphone deals available.</p>
@@ -156,27 +158,140 @@ function displaySmartphoneProducts(products, page = 1, sortBy = "relevance") {
         return;
     }
 
-    // Sort products
-    const sortedProducts = sortSmartphoneProducts(validProducts, sortBy);
+    // Sort products by relevance (you can modify this)
+    const sortedProducts = sortSmartphoneProducts(validProducts, "relevance");
 
-    // Pagination
-    const productsPerPage = 9;
-    const totalPages = Math.ceil(sortedProducts.length / productsPerPage);
-    const startIndex = (page - 1) * productsPerPage;
-    const endIndex = startIndex + productsPerPage;
-    const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+    // Determine products per slide based on screen size
+    // 5 products per slide for desktops and tablets, 4 for mobile devices
+    const productsPerSlide = window.innerWidth <= 768 ? 4 : 5;
 
-    // Create product cards
-    paginatedProducts.forEach(product => {
-        const productCard = createSmartphoneProductCard(product);
-        productsGrid.appendChild(productCard);
+    // Limit to exactly 4 slides
+    const maxProducts = 4 * productsPerSlide;
+    const limitedProducts = sortedProducts.slice(0, maxProducts);
+
+    // Create slides
+    const slides = [];
+    for (let i = 0; i < limitedProducts.length; i += productsPerSlide) {
+        slides.push(limitedProducts.slice(i, i + productsPerSlide));
+    }
+
+    // Create slide elements
+    slides.forEach((slideProducts, slideIndex) => {
+        const slide = document.createElement('div');
+        slide.className = 'slide';
+        if (slideIndex === 0) slide.classList.add('active');
+
+        slideProducts.forEach(product => {
+            const productCard = createSmartphoneProductCard(product);
+            slide.appendChild(productCard);
+        });
+
+        slider.appendChild(slide);
+
+        // Create indicator
+        const indicator = document.createElement('span');
+        indicator.className = 'indicator';
+        if (slideIndex === 0) indicator.classList.add('active');
+        indicator.addEventListener('click', () => showSmartphoneSlide(slideIndex));
+        indicatorsContainer.appendChild(indicator);
     });
 
-    // Update pagination if pagination element exists
-    const paginationElement = document.getElementById("smartphone-pagination");
-    if (paginationElement) {
-        updateSmartphonePagination(page, totalPages, sortBy);
+    // Initialize carousel
+    setupSmartphoneCarousel(slides.length);
+}
+
+/**
+ * Show specific slide in smartphone carousel
+ * @param {number} index - The slide index to show
+ */
+function showSmartphoneSlide(index) {
+    const slider = document.getElementById('smartphoneSlider');
+    const indicators = document.getElementById('smartphoneIndicators').querySelectorAll('.indicator');
+
+    if (!slider) return;
+
+    const slides = slider.querySelectorAll('.slide');
+
+    // Remove active class from all slides and indicators
+    slides.forEach(slide => slide.classList.remove('active'));
+    indicators.forEach(indicator => indicator.classList.remove('active'));
+
+    // Add active class to current slide and indicator
+    if (slides[index]) slides[index].classList.add('active');
+    if (indicators[index]) indicators[index].classList.add('active');
+}
+
+/**
+ * Setup smartphone carousel functionality
+ * @param {number} totalSlides - Total number of slides
+ */
+function setupSmartphoneCarousel(totalSlides) {
+    const slider = document.getElementById('smartphoneSlider');
+    if (!slider || totalSlides <= 1) return;
+
+    let currentIndex = 0;
+    let interval;
+
+    function updateSlide(newIndex) {
+        showSmartphoneSlide(newIndex);
+        currentIndex = newIndex;
     }
+
+    function nextSlide() {
+        const nextIndex = (currentIndex + 1) % totalSlides;
+        updateSlide(nextIndex);
+    }
+
+    function prevSlide() {
+        const prevIndex = (currentIndex - 1 + totalSlides) % totalSlides;
+        updateSlide(prevIndex);
+    }
+
+    function startCarousel() {
+        stopCarousel();
+        interval = setInterval(nextSlide, 14000); // 14 seconds
+    }
+
+    function stopCarousel() {
+        clearInterval(interval);
+    }
+
+    // Start carousel
+    updateSlide(0);
+    startCarousel();
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    slider.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        stopCarousel();
+    });
+
+    slider.addEventListener('touchend', (e) => {
+        const touchEndX = e.changedTouches[0].clientX;
+        const diff = touchEndX - touchStartX;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) prevSlide();
+            else nextSlide();
+        }
+        startCarousel();
+    });
+
+    // Pause on hover
+    slider.addEventListener('mouseenter', stopCarousel);
+    slider.addEventListener('mouseleave', startCarousel);
+
+    // Handle window resize to update products per slide
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            // Reinitialize with new screen size
+            if (window.currentSmartphoneProducts) {
+                displaySmartphoneProducts(window.currentSmartphoneProducts);
+            }
+        }, 250);
+    });
 }
 
 /**
@@ -353,15 +468,16 @@ async function fetchSmartphoneData() {
     }
 }
 
+
 /**
  * Initialize smartphone deals section
  */
 async function initializeSmartphoneDeals() {
     try {
         // Show loading state
-        const productsGrid = document.getElementById("tv-section").querySelector(".products-grid");
-        if (productsGrid) {
-            productsGrid.innerHTML = `
+        const slider = document.getElementById('smartphoneSlider');
+        if (slider) {
+            slider.innerHTML = `
                 <div class="loading-indicator">
                     <i class="fas fa-spinner fa-spin"></i>
                     <p>Loading smartphone deals...</p>
@@ -372,19 +488,19 @@ async function initializeSmartphoneDeals() {
         // Fetch smartphone data
         const smartphoneProducts = await fetchSmartphoneData();
 
-        // Store products globally for pagination
+        // Store products globally
         window.currentSmartphoneProducts = smartphoneProducts;
 
-        // Display products
-        displaySmartphoneProducts(smartphoneProducts, 1, "relevance");
+        // Display products in carousel
+        displaySmartphoneProducts(smartphoneProducts);
 
     } catch (error) {
         console.error('Error initializing smartphone deals:', error);
 
         // Show error state
-        const productsGrid = document.getElementById("tv-section").querySelector(".products-grid");
-        if (productsGrid) {
-            productsGrid.innerHTML = `
+        const slider = document.getElementById('smartphoneSlider');
+        if (slider) {
+            slider.innerHTML = `
                 <div class="error-state" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 0;">
                     <i class="fas fa-exclamation-triangle" style="font-size: 48px; color: #ff6b6b; margin-bottom: 20px;"></i>
                     <h3 style="color: #333; margin-bottom: 10px;">Failed to load smartphone deals</h3>
