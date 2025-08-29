@@ -1274,6 +1274,14 @@
             gap: 20px;
             grid-template-columns: repeat(5, 1fr);
         }
+
+        /* Responsive grid for smartphone carousel */
+        @media (max-width: 768px) {
+            .slide {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px;
+            }
+        }
         .slide.active {
             opacity: 1;
             visibility: visible;
@@ -1795,7 +1803,7 @@
         
         @media (max-width: 1023px) and (min-width: 768px) {
             .slide {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(5, 1fr);
                 gap: 16px;
             }
             .product-card {
